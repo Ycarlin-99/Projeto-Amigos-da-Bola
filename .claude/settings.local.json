@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npm install --no-audit --no-fund 2>&1)",
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\cavig\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-cavig-OneDrive-Documentos-Amigos-da-Bola\\\\f2148a84-0039-4b9f-966a-7f28b29962a3\\\\scratchpad\\\\testar-sorteio.ts\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\cavig\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-cavig-OneDrive-Documentos-Amigos-da-Bola\\\\f2148a84-0039-4b9f-966a-7f28b29962a3\\\\scratchpad\\\\testar-formacoes.ts\" 2>$null)",
+      "PowerShell(node \"C:\\\\Users\\\\cavig\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-cavig-OneDrive-Documentos-Amigos-da-Bola\\\\f2148a84-0039-4b9f-966a-7f28b29962a3\\\\scratchpad\\\\testar-formacoes.ts\" 2>&1)",
+      "Bash(find \"/c/Users/cavig/OneDrive/Documentos\" -maxdepth 3 -type f \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \\\\\\) 2>/dev/null | head -40)",
+      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|webp\\)$\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/entrar)",
+      "PowerShell(cd \"C:\\\\Users\\\\cavig\\\\OneDrive\\\\Documentos\\\\Amigos da Bola\"; $env:PORT=3005; npm run dev 2>&1 | Out-File \"$env:TEMP\\\\adb-dev.log\")",
+      "Bash(xxd escudo.png)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{content_type}\\\\n\" http://localhost:3005/escudo.png)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3005/_next/image?url=%2Fescudo.png&w=384&q=75\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3005/entrar)"
+    ]
+  }
+}

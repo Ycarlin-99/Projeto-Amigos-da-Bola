@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------
+   Identidade visual — tirada do escudo do Amigos da Bola:
+   azul-marinho do fundo, dourado do trigo, branco da espuma.
+   --------------------------------------------------------------------- */
+@theme {
+  --color-marinho-50: #eef0fb;
+  --color-marinho-100: #dde1f6;
+  --color-marinho-200: #bcc3ed;
+  --color-marinho-300: #8e99df;
+  --color-marinho-400: #6470c4;
+  --color-marinho-500: #454a9e;
+  --color-marinho-600: #3a3f8a;
+  --color-marinho-700: #2f3370;
+  --color-marinho-800: #262a5c;
+  --color-marinho-900: #1c1f45;
+
+  --color-ouro-100: #fdf3dd;
+  --color-ouro-300: #f2d385;
+  --color-ouro-400: #e8b33c;
+  --color-ouro-500: #d69f24;
+  --color-ouro-600: #b07f16;
+
+  --color-campo-100: #dcfce7;
+  --color-campo-500: #16a34a;
+  --color-campo-600: #15803d;
+  --color-campo-700: #166534;
+
+  --font-sans: var(--fonte-sistema);
+
+  /* Público de 18 a 70 anos: texto grande por padrão, nada de 12px. */
+  --text-base: 1.0625rem;
+  --text-lg: 1.1875rem;
+}
+
+:root {
+  --fonte-sistema: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  color-scheme: light;
+}
+
+html {
+  /* Evita o "pulo" da página ao abrir modais/menus. */
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: #f4f5f8;
+  color: #1c1f2b;
+  font-family: var(--fonte-sistema);
+  -webkit-font-smoothing: antialiased;
+  /* Área segura do iPhone quando instalado como app. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Foco sempre visível — acessibilidade e teclado. */
+:focus-visible {
+  outline: 3px solid var(--color-marinho-400);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Alvos de toque confortáveis para dedo grande e mão trêmula. */
+button,
+[role="button"],
+a.botao,
+input,
+select,
+textarea {
+  min-height: 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@utility cartao {
+  background-color: white;
+  border-radius: 1rem;
+  border: 1px solid #e6e8ef;
+  box-shadow: 0 1px 2px rgb(28 31 43 / 0.04);
+}

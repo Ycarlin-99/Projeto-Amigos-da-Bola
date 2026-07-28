@@ -1,0 +1,19 @@
+{
+  "name": "Amigos da Bola",
+  "short_name": "Amigos da Bola",
+  "description": "O app da pelada: calendário, presença e sorteio dos times.",
+  "start_url": "/partidas",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f5f8",
+  "theme_color": "#454a9e",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/escudo.png",
+      "sizes": "640x640",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
