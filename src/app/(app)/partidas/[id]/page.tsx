@@ -6,10 +6,11 @@ import { ROTULO_POSICAO, type Jogador, type Partida, type StatusPresenca } from 
 import {
   acharFormacao,
   ROTULO_SETOR,
-  SETOR_DA_POSICAO,
+  setoresDoJogador,
   SETORES,
   type Setor,
 } from "@/lib/formacoes";
+import { qtdTimesPorPresenca } from "@/lib/sorteio";
 import BotoesPresenca from "@/components/botoes-presenca";
 import { Etiqueta } from "@/components/ui";
 import ControlesAdmin from "./controles-admin";
@@ -59,10 +60,16 @@ export default async function PaginaPartida({
   const ausentes = porStatus("nao_vou");
 
   const meuStatus = lista.find((p) => p.jogadores?.id === jogador?.id)?.status ?? null;
-  const vagas = partida.qtd_times * partida.jogadores_por_time;
   const cancelada = partida.status === "cancelada";
   const prazoEncerrado = jaPassou(partida.prazo_confirmacao);
   const timesSorteados = (times ?? []) as unknown as TimeComJogadores[];
+
+  // O nº de times vem da presença. Antes do sorteio é só uma prévia; depois, o
+  // que realmente saiu. Só marca "reserva" quando já dá para formar 2 times.
+  const porTime = partida.jogadores_por_time;
+  const previaTimes = qtdTimesPorPresenca(confirmados.length, porTime);
+  const timesFinais = timesSorteados.length > 0 ? timesSorteados.length : previaTimes;
+  const vagas = timesFinais >= 2 ? timesFinais * porTime : confirmados.length;
 
   return (
     <div className="space-y-6">
@@ -82,7 +89,9 @@ export default async function PaginaPartida({
           </Linha>
           <Linha rotulo="Onde">{partida.local}</Linha>
           <Linha rotulo="Formato">
-            {partida.qtd_times} times de {partida.jogadores_por_time}
+            {timesSorteados.length > 0
+              ? `${timesSorteados.length} times de ${porTime}`
+              : `${porTime} por time · nº de times conforme a presença`}
             {formacao ? ` · ${formacao.nome}` : ""}
           </Linha>
           <Linha rotulo="Confirmar até">{dataHora(partida.prazo_confirmacao)}</Linha>
@@ -121,7 +130,7 @@ export default async function PaginaPartida({
           <p className="mt-2 text-sm text-slate-500">
             {formacao
               ? `Times montados na formação ${formacao.nome} e equilibrados por nível. Quem está fora da posição de origem aparece com o papel deste jogo.`
-              : "Times equilibrados por nível e posição."}{" "}
+              : "Formação escolhida automaticamente pelas posições de quem apareceu, com os times equilibrados por nível."}{" "}
             Sortear de novo gera uma divisão diferente.
           </p>
         </section>
@@ -192,7 +201,7 @@ function CartaoTime({ time }: { time: TimeComJogadores }) {
               </p>
               <ul className="space-y-1">
                 {doSetor.map(({ jogadores: j, papel }) => {
-                  const foraDePosicao = papel !== SETOR_DA_POSICAO[j.posicao];
+                  const foraDePosicao = !setoresDoJogador(j.posicoes ?? [j.posicao]).includes(papel);
                   return (
                     <li key={j.id} className="flex items-center gap-2">
                       <span className="font-semibold text-slate-800">{j.nome}</span>

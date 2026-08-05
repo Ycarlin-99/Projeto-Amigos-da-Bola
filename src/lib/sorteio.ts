@@ -1,5 +1,21 @@
-import { SETORES, SETOR_DA_POSICAO, type Formacao, type Setor } from "./formacoes";
-import type { Jogador } from "./tipos";
+import {
+  SETORES,
+  formacoesPara,
+  setoresDoJogador,
+  type Formacao,
+  type Setor,
+} from "./formacoes";
+import type { Jogador, Posicao } from "./tipos";
+
+/** As posições do jogador, com uma rede de segurança para dados antigos. */
+function posicoesDe(j: Jogador): Posicao[] {
+  return j.posicoes?.length ? j.posicoes : [j.posicao];
+}
+
+/** Os setores que o jogador cobre (a partir de todas as suas posições). */
+function setoresDe(j: Jogador): Setor[] {
+  return setoresDoJogador(posicoesDe(j));
+}
 
 /**
  * Sorteio inteligente de times.
@@ -159,8 +175,8 @@ function montarComFormacao(
   const setoresAbertos = (time: JogadorEscalado[]) =>
     SETORES.filter((s) => contarPapel(time, s) < alvo[s]);
 
-  // 1. Goleiros de verdade, um por time.
-  const goleiros = disponiveis.filter((j) => j.posicao === "goleiro").slice(0, qtdTimes);
+  // 1. Goleiros de verdade, um por time (quem tem "goleiro" entre as posições).
+  const goleiros = disponiveis.filter((j) => setoresDe(j).includes("goleiro")).slice(0, qtdTimes);
   goleiros.forEach((goleiro, i) => {
     times[i].push({ ...goleiro, papel: "goleiro" });
     remover(goleiro);
@@ -181,13 +197,16 @@ function montarComFormacao(
       const abertos = setoresAbertos(times[t]);
       if (abertos.length === 0) continue;
 
+      // Entre os mais fortes disponíveis, prefere quem tem uma das suas posições
+      // com vaga aberta neste time. Escala nessa posição (a principal primeiro).
       const janela = disponiveis.slice(0, Math.max(qtdTimes, 1));
-      const naPosicao = janela.find((j) => abertos.includes(SETOR_DA_POSICAO[j.posicao]));
+      const naPosicao = janela.find((j) => setoresDe(j).some((s) => abertos.includes(s)));
 
       const escolhido = naPosicao ?? disponiveis[0];
+      const setoresDele = setoresDe(escolhido);
       const papel = naPosicao
-        ? SETOR_DA_POSICAO[escolhido.posicao]
-        : setorAbertoMaisProximo(abertos, SETOR_DA_POSICAO[escolhido.posicao]);
+        ? setoresDele.find((s) => abertos.includes(s))!
+        : setorAbertoMaisProximo(abertos, setoresDele[0]);
 
       times[t].push({ ...escolhido, papel });
       remover(escolhido);
@@ -225,11 +244,15 @@ function montarAutomatico(escalados: Jogador[], qtdTimes: number): JogadorEscala
   const remover = (j: Jogador) => disponiveis.splice(disponiveis.indexOf(j), 1);
 
   // Goleiros de verdade primeiro, um por time.
-  const goleiros = disponiveis.filter((j) => j.posicao === "goleiro").slice(0, qtdTimes);
+  const goleiros = disponiveis.filter((j) => setoresDe(j).includes("goleiro")).slice(0, qtdTimes);
   goleiros.forEach((goleiro, i) => {
     times[i].push({ ...goleiro, papel: "goleiro" });
     remover(goleiro);
   });
+
+  // Setor da vez para um jogador: entre os que ele cobre, o menos preenchido.
+  const setorMenosCheio = (time: JogadorEscalado[], j: Jogador) =>
+    setoresDe(j).reduce((a, b) => (contarPapel(time, b) < contarPapel(time, a) ? b : a));
 
   let rodada = 0;
   while (disponiveis.length > 0) {
@@ -244,13 +267,13 @@ function montarAutomatico(escalados: Jogador[], qtdTimes: number): JogadorEscala
       const janela = disponiveis.slice(0, Math.max(qtdTimes, 1));
       // Entre os mais fortes, o que cobre o setor menos preenchido do time.
       const melhor = janela.reduce((a, b) =>
-        contarPapel(times[t], SETOR_DA_POSICAO[b.posicao]) <
-        contarPapel(times[t], SETOR_DA_POSICAO[a.posicao])
+        contarPapel(times[t], setorMenosCheio(times[t], b)) <
+        contarPapel(times[t], setorMenosCheio(times[t], a))
           ? b
           : a,
       );
 
-      times[t].push({ ...melhor, papel: SETOR_DA_POSICAO[melhor.posicao] });
+      times[t].push({ ...melhor, papel: setorMenosCheio(times[t], melhor) });
       remover(melhor);
     }
 
@@ -263,24 +286,114 @@ function montarAutomatico(escalados: Jogador[], qtdTimes: number): JogadorEscala
 }
 
 // ---------------------------------------------------------------------------
+// Escolha automática da tática, conforme as posições de quem apareceu
+// ---------------------------------------------------------------------------
+
+const SETORES_LINHA: Setor[] = ["defesa", "meio", "ataque"];
+
+/**
+ * Estima quantos jogadores ficariam FORA de posição se os times fossem montados
+ * numa dada formação. Distribui a "oferta" de cada setor (quantos cobrem aquele
+ * setor) pela "demanda" (vagas daquele setor somando todos os times), começando
+ * pelos setores mais escassos, para não desperdiçar quem é especialista.
+ */
+function foraDePosicaoEstimado(escalados: Jogador[], alvoPorTime: Alvo, qtdTimes: number): number {
+  const demanda: Record<Setor, number> = {
+    goleiro: alvoPorTime.goleiro * qtdTimes,
+    defesa: alvoPorTime.defesa * qtdTimes,
+    meio: alvoPorTime.meio * qtdTimes,
+    ataque: alvoPorTime.ataque * qtdTimes,
+  };
+
+  // Só as linhas de campo entram na comparação — o gol pesa igual em toda
+  // formação, então não muda qual tática é a melhor.
+  const capazes: Record<Setor, Jogador[]> = { goleiro: [], defesa: [], meio: [], ataque: [] };
+  for (const j of escalados) {
+    for (const s of setoresDe(j)) if (s !== "goleiro") capazes[s].push(j);
+  }
+
+  const usados = new Set<Jogador>();
+  let encaixados = 0;
+  // Preenche primeiro o setor com menos gente capaz (o mais difícil de cobrir).
+  const ordem = [...SETORES_LINHA].sort((a, b) => capazes[a].length - capazes[b].length);
+  for (const setor of ordem) {
+    let vagas = demanda[setor];
+    for (const j of capazes[setor]) {
+      if (vagas === 0) break;
+      if (usados.has(j)) continue;
+      usados.add(j);
+      encaixados++;
+      vagas--;
+    }
+  }
+
+  const vagasDeLinha = demanda.defesa + demanda.meio + demanda.ataque;
+  return vagasDeLinha - encaixados;
+}
+
+/**
+ * Escolhe, no catálogo de táticas do tamanho de time, a que deixa MENOS gente
+ * fora de posição para o elenco que confirmou. Empate fica com a primeira do
+ * catálogo (as equilibradas vêm primeiro). Devolve null se não houver catálogo.
+ */
+export function escolherFormacaoAutomatica(
+  escalados: Jogador[],
+  qtdTimes: number,
+  jogadoresPorTime: number,
+): Formacao | null {
+  const candidatas = formacoesPara(jogadoresPorTime);
+  if (candidatas.length === 0) return null;
+
+  let melhor = candidatas[0];
+  let melhorPenalidade = Infinity;
+  for (const f of candidatas) {
+    const penalidade = foraDePosicaoEstimado(
+      escalados,
+      { goleiro: 1, defesa: f.defesa, meio: f.meio, ataque: f.ataque },
+      qtdTimes,
+    );
+    if (penalidade < melhorPenalidade) {
+      melhorPenalidade = penalidade;
+      melhor = f;
+    }
+  }
+  return melhor;
+}
+
+// ---------------------------------------------------------------------------
 // Ponto de entrada
 // ---------------------------------------------------------------------------
 
+/** Quantos times cabem, dado quem confirmou e o tamanho de cada time. */
+export function qtdTimesPorPresenca(
+  confirmados: number,
+  jogadoresPorTime: number,
+  maxTimes = IDENTIDADE_TIMES.length,
+): number {
+  const cabem = Math.floor(confirmados / jogadoresPorTime);
+  return Math.max(0, Math.min(maxTimes, cabem));
+}
+
 /**
- * Sorteia os confirmados em `qtdTimes` times equilibrados. Passe `formacao`
- * para preencher uma tática específica, ou `null` para o modo automático.
- * Quem não couber nas vagas entra na lista de espera (`reservas`), em ordem de
- * chegada da confirmação.
+ * Sorteia os confirmados em times equilibrados.
+ *
+ * - O número de times sai da PRESENÇA: quantos times cheios dá para formar com
+ *   `jogadoresPorTime` cada. Quem sobra vai para a lista de espera (`reservas`).
+ * - A TÁTICA é escolhida automaticamente pelas posições de quem apareceu, a não
+ *   ser que `opcoes.formacao` force uma específica.
  */
 export function sortearTimes(
   confirmados: Jogador[],
-  qtdTimes: number,
   jogadoresPorTime: number,
-  formacao?: Formacao | null,
-): { times: TimeSorteado[]; reservas: Jogador[] } {
+  opcoes: { formacao?: Formacao | null; maxTimes?: number } = {},
+): { times: TimeSorteado[]; reservas: Jogador[]; qtdTimes: number; formacao: Formacao | null } {
+  const qtdTimes = qtdTimesPorPresenca(confirmados.length, jogadoresPorTime, opcoes.maxTimes);
   const totalDeVagas = qtdTimes * jogadoresPorTime;
   const escalados = confirmados.slice(0, totalDeVagas);
   const reservas = confirmados.slice(totalDeVagas);
+
+  const formacao =
+    opcoes.formacao ?? escolherFormacaoAutomatica(escalados, qtdTimes, jogadoresPorTime);
 
   const times = formacao
     ? montarComFormacao(escalados, qtdTimes, {
@@ -300,5 +413,7 @@ export function sortearTimes(
       forca: forcaDoTime(jogadores),
     })),
     reservas,
+    qtdTimes,
+    formacao,
   };
 }

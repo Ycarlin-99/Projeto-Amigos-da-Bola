@@ -17,8 +17,17 @@ export default function FormularioPerfil({ jogador }: { jogador: Jogador }) {
 
   return (
     <form action={enviar} className="cartao space-y-5 p-5">
-      <Campo rotulo="Nome">
-        <Entrada name="nome" required defaultValue={jogador.nome} autoComplete="name" />
+      <Campo rotulo="Apelido no futebol" dica="É como você aparece na lista e nos times.">
+        <Entrada name="nome" required defaultValue={jogador.nome} autoComplete="nickname" />
+      </Campo>
+
+      <Campo rotulo="Nome completo (opcional)">
+        <Entrada
+          name="nome_completo"
+          defaultValue={jogador.nome_completo ?? ""}
+          autoComplete="name"
+          placeholder="Seu nome de verdade"
+        />
       </Campo>
 
       <Campo rotulo="Telefone (opcional)" dica="Serve para o organizador te achar no WhatsApp.">
@@ -32,14 +41,35 @@ export default function FormularioPerfil({ jogador }: { jogador: Jogador }) {
         />
       </Campo>
 
-      <Campo rotulo="Posição que você joga">
-        <Selecao name="posicao" defaultValue={jogador.posicao}>
-          {POSICOES.map((p) => (
-            <option key={p} value={p}>
-              {ROTULO_POSICAO[p]}
-            </option>
-          ))}
-        </Selecao>
+      <Campo
+        rotulo="Posições que você joga"
+        dica="A principal e até duas de reserva. O sorteio tenta te escalar numa delas."
+      >
+        <div className="space-y-2">
+          <Selecao name="posicao1" defaultValue={jogador.posicoes?.[0] ?? jogador.posicao}>
+            {POSICOES.map((p) => (
+              <option key={p} value={p}>
+                {ROTULO_POSICAO[p]} (principal)
+              </option>
+            ))}
+          </Selecao>
+          <Selecao name="posicao2" defaultValue={jogador.posicoes?.[1] ?? ""}>
+            <option value="">2ª posição (opcional)</option>
+            {POSICOES.map((p) => (
+              <option key={p} value={p}>
+                {ROTULO_POSICAO[p]}
+              </option>
+            ))}
+          </Selecao>
+          <Selecao name="posicao3" defaultValue={jogador.posicoes?.[2] ?? ""}>
+            <option value="">3ª posição (opcional)</option>
+            {POSICOES.map((p) => (
+              <option key={p} value={p}>
+                {ROTULO_POSICAO[p]}
+              </option>
+            ))}
+          </Selecao>
+        </div>
       </Campo>
 
       <Campo rotulo="Perna boa">

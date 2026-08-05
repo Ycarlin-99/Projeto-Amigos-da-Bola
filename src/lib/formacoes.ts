@@ -21,6 +21,17 @@ export const ROTULO_SETOR: Record<Setor, string> = {
 };
 
 /**
+ * Os setores que um jogador consegue cobrir, a partir das posições que ele
+ * cadastrou (até 3). A ordem é preservada, então o setor da posição principal
+ * vem primeiro — o sorteio usa isso para preferir a posição de preferência.
+ */
+export function setoresDoJogador(posicoes: Posicao[]): Setor[] {
+  const vistos = new Set<Setor>();
+  for (const p of posicoes) vistos.add(SETOR_DA_POSICAO[p]);
+  return [...vistos];
+}
+
+/**
  * Uma tática. O goleiro é sempre 1 e fica implícito, então
  * defesa + meio + ataque = (jogadores por time − 1), no estilo consagrado
  * 4-3-3 (4 na defesa, 3 no meio, 3 no ataque, mais o goleiro).

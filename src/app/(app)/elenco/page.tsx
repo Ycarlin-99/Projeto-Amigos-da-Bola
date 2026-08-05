@@ -38,7 +38,8 @@ export default async function PaginaElenco() {
                   {j.admin && <Etiqueta cor="ouro">organizador</Etiqueta>}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {ROTULO_POSICAO[j.posicao]} · {ROTULO_PERNA[j.perna]}
+                  {(j.posicoes ?? [j.posicao]).map((p) => ROTULO_POSICAO[p]).join(", ")} ·{" "}
+                  {ROTULO_PERNA[j.perna]}
                 </p>
               </div>
 

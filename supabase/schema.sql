@@ -9,10 +9,16 @@
 -- ---------------------------------------------------------------------
 create table if not exists public.jogadores (
   id            uuid primary key references auth.users (id) on delete cascade,
-  nome          text not null,
+  nome          text not null,               -- apelido no futebol (nome de exibição)
+  nome_completo text,                         -- nome de verdade (opcional)
   telefone      text,
-  posicao       text not null default 'meia'
+  posicao       text not null default 'meia'  -- posição principal (= posicoes[1])
                 check (posicao in ('goleiro','zagueiro','lateral','volante','meia','atacante')),
+  posicoes      text[] not null default array['meia']::text[]  -- até 3 posições (a 1ª é a principal)
+                check (
+                  coalesce(array_length(posicoes, 1), 0) between 1 and 3
+                  and posicoes <@ array['goleiro','zagueiro','lateral','volante','meia','atacante']::text[]
+                ),
   perna         text not null default 'destra'
                 check (perna in ('destra','canhota','ambidestro')),
   nivel         smallint not null default 3 check (nivel between 1 and 5),
@@ -77,6 +83,8 @@ create table if not exists public.times_jogadores (
 -- Colunas novas para quem já rodou uma versão anterior deste schema.
 alter table public.partidas        add column if not exists formacao text;
 alter table public.times_jogadores add column if not exists papel text not null default 'meio';
+alter table public.jogadores       add column if not exists nome_completo text;
+alter table public.jogadores       add column if not exists posicoes text[] not null default array['meia']::text[];
 
 -- ---------------------------------------------------------------------
 -- Cria o perfil automaticamente quando alguém se cadastra.
@@ -93,10 +101,11 @@ declare
 begin
   select count(*) = 0 into primeiro from public.jogadores;
 
-  insert into public.jogadores (id, nome, telefone, admin)
+  insert into public.jogadores (id, nome, nome_completo, telefone, admin)
   values (
     new.id,
     coalesce(nullif(trim(new.raw_user_meta_data ->> 'nome'), ''), split_part(new.email, '@', 1)),
+    nullif(trim(new.raw_user_meta_data ->> 'nome_completo'), ''),
     nullif(trim(new.raw_user_meta_data ->> 'telefone'), ''),
     primeiro
   )

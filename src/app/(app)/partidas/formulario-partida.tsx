@@ -92,42 +92,33 @@ export default function FormularioPartida({
         />
       </Campo>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Campo rotulo="Quantos times">
-          <Selecao name="qtd_times" defaultValue={String(partida?.qtd_times ?? 2)}>
-            {[2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n} times
-              </option>
-            ))}
-          </Selecao>
-        </Campo>
-
-        <Campo rotulo="Jogadores por time">
-          <Selecao
-            name="jogadores_por_time"
-            value={String(porTime)}
-            onChange={(e) => aoMudarPorTime(Number(e.target.value))}
-          >
-            {[3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
-              <option key={n} value={n}>
-                {n} por time
-              </option>
-            ))}
-          </Selecao>
-        </Campo>
-      </div>
+      <Campo
+        rotulo="Jogadores por time"
+        dica="O número de times sai da presença: quantos times cheios der para formar com quem confirmar."
+      >
+        <Selecao
+          name="jogadores_por_time"
+          value={String(porTime)}
+          onChange={(e) => aoMudarPorTime(Number(e.target.value))}
+        >
+          {[3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
+            <option key={n} value={n}>
+              {n} por time
+            </option>
+          ))}
+        </Selecao>
+      </Campo>
 
       <Campo
         rotulo="Tática do sorteio"
-        dica="Define como os times são montados. No automático, o sorteio só equilibra os setores; numa tática, ele preenche exatamente aquele desenho."
+        dica="No automático, o sorteio escolhe a formação pelas posições de quem apareceu. Escolha uma tática só se quiser forçar um desenho fixo."
       >
         <Selecao
           name="formacao"
           value={formacao}
           onChange={(e) => setFormacao(e.target.value)}
         >
-          <option value="">Automático (só equilibra)</option>
+          <option value="">Automático (escolhe pelos jogadores)</option>
           {taticas.map((t) => (
             <option key={t.id} value={t.id}>
               {t.nome} — {t.descricao}

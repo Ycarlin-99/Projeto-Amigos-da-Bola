@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/sessao";
 import { acharFormacao } from "@/lib/formacoes";
-import { sortearTimes } from "@/lib/sorteio";
+import { qtdTimesPorPresenca, sortearTimes } from "@/lib/sorteio";
 import type { Jogador } from "@/lib/tipos";
 
 type Resultado = { erro?: string };
@@ -25,7 +25,7 @@ function lerFormulario(dados: FormData) {
     local: String(dados.get("local") ?? "").trim(),
     inicio,
     prazo_confirmacao: prazo,
-    qtd_times: Number(dados.get("qtd_times") ?? 2),
+    // O nº de times não é mais fixo aqui: sai da presença na hora do sorteio.
     jogadores_por_time,
     formacao,
     observacoes: String(dados.get("observacoes") ?? "").trim() || null,
@@ -127,7 +127,7 @@ export async function sortearPartida(partidaId: string): Promise<Resultado> {
 
   const { data: partida } = await supabase
     .from("partidas")
-    .select("qtd_times, jogadores_por_time, formacao")
+    .select("jogadores_por_time, formacao")
     .eq("id", partidaId)
     .single();
 
@@ -144,16 +144,17 @@ export async function sortearPartida(partidaId: string): Promise<Resultado> {
     .map((p) => p.jogadores as unknown as Jogador)
     .filter(Boolean);
 
-  if (confirmados.length < partida.qtd_times * 2) {
-    return { erro: `Ainda são poucos confirmados para formar ${partida.qtd_times} times.` };
+  const porTime = partida.jogadores_por_time;
+  if (qtdTimesPorPresenca(confirmados.length, porTime) < 2) {
+    return {
+      erro: `Confirmados de menos: precisa de pelo menos ${porTime * 2} para formar 2 times de ${porTime}.`,
+    };
   }
 
-  const { times } = sortearTimes(
-    confirmados,
-    partida.qtd_times,
-    partida.jogadores_por_time,
-    acharFormacao(partida.jogadores_por_time, partida.formacao),
-  );
+  // Sem tática escolhida na mão, o sorteio decide a formação pelas posições.
+  const { times } = sortearTimes(confirmados, porTime, {
+    formacao: acharFormacao(porTime, partida.formacao),
+  });
 
   // Apagar antes de gravar mantém o sorteio idempotente: sortear de novo
   // substitui o anterior em vez de acumular times fantasma.

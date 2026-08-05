@@ -2,6 +2,7 @@ import Link from "next/link";
 import { sessao } from "@/lib/sessao";
 import { dataLonga, hora, jaPassou, quandoEmPalavras } from "@/lib/datas";
 import type { Partida, Presenca } from "@/lib/tipos";
+import { qtdTimesPorPresenca } from "@/lib/sorteio";
 import BotoesPresenca from "@/components/botoes-presenca";
 import { BotaoLink, Etiqueta, Vazio } from "@/components/ui";
 
@@ -129,7 +130,8 @@ function CartaoPartida({
 }) {
   const cancelada = partida.status === "cancelada";
   const prazoEncerrado = jaPassou(partida.prazo_confirmacao);
-  const vagas = partida.qtd_times * partida.jogadores_por_time;
+  const porTime = partida.jogadores_por_time;
+  const times = qtdTimesPorPresenca(confirmados, porTime);
 
   return (
     <div className={`cartao overflow-hidden ${cancelada ? "opacity-70" : ""}`}>
@@ -151,8 +153,10 @@ function CartaoPartida({
         </div>
 
         <p className="mt-3 text-base font-semibold text-slate-700">
-          {confirmados} de {vagas} confirmados
-          {confirmados > vagas && " (com reservas)"}
+          {confirmados} {confirmados === 1 ? "confirmado" : "confirmados"}
+          {times >= 2
+            ? ` · dá para ${times} times de ${porTime}`
+            : ` · faltam para 2 times de ${porTime}`}
         </p>
       </Link>
 

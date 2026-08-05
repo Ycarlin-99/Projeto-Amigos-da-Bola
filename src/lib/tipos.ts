@@ -20,8 +20,10 @@ export type StatusPartida = "agendada" | "cancelada" | "realizada";
 export type Jogador = {
   id: string;
   nome: string;
+  nome_completo: string | null;
   telefone: string | null;
   posicao: Posicao;
+  posicoes: Posicao[];
   perna: Perna;
   nivel: number;
   admin: boolean;
