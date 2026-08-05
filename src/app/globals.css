@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Escaneia o código-fonte relativo a ESTE arquivo (não ao diretório de
+   trabalho), para o Tailwind gerar as classes mesmo quando o dev server
+   roda a partir de outra pasta. */
+@source "../";
+
 /* ---------------------------------------------------------------------
    Identidade visual — tirada do escudo do Amigos da Bola:
    azul-marinho do fundo, dourado do trigo, branco da espuma.

@@ -131,6 +131,27 @@ as $$
   select coalesce((select admin from public.jogadores where id = auth.uid()), false);
 $$;
 
+-- Só um organizador pode mudar quem é organizador (a coluna admin). Sem isto,
+-- o RLS deixaria alguém se autopromover editando a própria linha via API.
+create or replace function public.protege_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.admin is distinct from old.admin and not public.eh_admin() then
+    raise exception 'Apenas um organizador pode mudar quem e organizador.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists jogadores_protege_admin on public.jogadores;
+create trigger jogadores_protege_admin
+  before update on public.jogadores
+  for each row execute function public.protege_admin();
+
 -- ---------------------------------------------------------------------
 -- RLS — ninguém que não esteja logado enxerga nada.
 -- ---------------------------------------------------------------------

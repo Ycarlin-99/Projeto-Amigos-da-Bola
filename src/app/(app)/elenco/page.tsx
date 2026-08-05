@@ -1,7 +1,7 @@
 import { sessao } from "@/lib/sessao";
 import { ROTULO_PERNA, ROTULO_POSICAO, type Jogador } from "@/lib/tipos";
 import { Etiqueta, Vazio } from "@/components/ui";
-import SeletorNivel from "./seletor-nivel";
+import BotaoOrganizador from "./botao-organizador";
 
 export const metadata = { title: "Elenco — Amigos da Bola" };
 
@@ -43,11 +43,12 @@ export default async function PaginaElenco() {
                 </p>
               </div>
 
-              {admin ? (
-                <SeletorNivel jogadorId={j.id} nivelAtual={j.nivel} />
-              ) : (
+              <div className="flex flex-col items-end gap-2">
                 <Estrelas nivel={j.nivel} />
-              )}
+                {admin && j.id !== jogador?.id && (
+                  <BotaoOrganizador jogadorId={j.id} ehOrganizador={j.admin} />
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -55,8 +56,9 @@ export default async function PaginaElenco() {
 
       {admin && (
         <p className="text-sm text-slate-500">
-          Como organizador, você pode ajustar o nível de cada um. É esse número
-          que o sorteio usa para equilibrar os times.
+          Como organizador, você pode tornar outras pessoas organizadoras — elas
+          passam a criar jogos, editar e sortear os times. O nível de cada um é
+          definido no próprio perfil.
         </p>
       )}
     </div>

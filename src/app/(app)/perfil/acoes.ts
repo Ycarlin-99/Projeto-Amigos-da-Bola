@@ -52,24 +52,3 @@ export async function salvarPerfil(
   revalidatePath("/elenco");
   return { salvo: true };
 }
-
-/**
- * Ajuste de nível pelo organizador.
- * Existe porque a auto-avaliação puxa para cima — quase todo mundo se acha nota
- * 4. Sem essa correção, o sorteio equilibra com números que não são reais.
- */
-export async function ajustarNivel(jogadorId: string, nivel: number) {
-  const { supabase, jogador } = await sessao();
-  if (!jogador?.admin) return { erro: "Só o organizador pode mudar o nível." };
-  if (!Number.isInteger(nivel) || nivel < 1 || nivel > 5) return { erro: "Nível inválido." };
-
-  const { error } = await supabase
-    .from("jogadores")
-    .update({ nivel })
-    .eq("id", jogadorId);
-
-  if (error) return { erro: "Não foi possível salvar o nível." };
-
-  revalidatePath("/elenco");
-  return {};
-}
