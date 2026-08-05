@@ -5,7 +5,7 @@ import {
   type Formacao,
   type Setor,
 } from "./formacoes";
-import type { Jogador, Posicao } from "./tipos";
+import { nivelEfetivo, type Jogador, type Posicao } from "./tipos";
 
 /** As posições do jogador, com uma rede de segurança para dados antigos. */
 function posicoesDe(j: Jogador): Posicao[] {
@@ -387,10 +387,14 @@ export function sortearTimes(
   jogadoresPorTime: number,
   opcoes: { formacao?: Formacao | null; maxTimes?: number } = {},
 ): { times: TimeSorteado[]; reservas: Jogador[]; qtdTimes: number; formacao: Formacao | null } {
-  const qtdTimes = qtdTimesPorPresenca(confirmados.length, jogadoresPorTime, opcoes.maxTimes);
+  // Passa a usar o nível efetivo (calculado pelas notas do avaliador, ou o do
+  // perfil se ainda não houver nota) para equilibrar os times.
+  const base = confirmados.map((j) => ({ ...j, nivel: nivelEfetivo(j) }));
+
+  const qtdTimes = qtdTimesPorPresenca(base.length, jogadoresPorTime, opcoes.maxTimes);
   const totalDeVagas = qtdTimes * jogadoresPorTime;
-  const escalados = confirmados.slice(0, totalDeVagas);
-  const reservas = confirmados.slice(totalDeVagas);
+  const escalados = base.slice(0, totalDeVagas);
+  const reservas = base.slice(totalDeVagas);
 
   const formacao =
     opcoes.formacao ?? escolherFormacaoAutomatica(escalados, qtdTimes, jogadoresPorTime);

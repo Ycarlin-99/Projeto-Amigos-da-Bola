@@ -36,3 +36,24 @@ export async function alternarOrganizador(
   revalidatePath("/elenco");
   return {};
 }
+
+/**
+ * Designa (ou remove) o avaliador — a pessoa que dá nota nos jogos e faz o
+ * check-in de quem apareceu. Só um organizador pode mudar isso.
+ */
+export async function alternarAvaliador(
+  jogadorId: string,
+  tornar: boolean,
+): Promise<Resultado> {
+  const { supabase } = await exigirAdmin();
+
+  const { error } = await supabase
+    .from("jogadores")
+    .update({ avaliador: tornar })
+    .eq("id", jogadorId);
+
+  if (error) return { erro: "Não foi possível alterar. Tente de novo." };
+
+  revalidatePath("/elenco");
+  return {};
+}

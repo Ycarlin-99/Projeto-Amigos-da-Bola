@@ -14,8 +14,13 @@ import { qtdTimesPorPresenca } from "@/lib/sorteio";
 import BotoesPresenca from "@/components/botoes-presenca";
 import { Etiqueta } from "@/components/ui";
 import ControlesAdmin from "./controles-admin";
+import AvaliacaoJogo from "./avaliacao-jogo";
 
-type PresencaComJogador = { status: StatusPresenca; jogadores: Jogador };
+type PresencaComJogador = {
+  status: StatusPresenca;
+  compareceu: boolean | null;
+  jogadores: Jogador;
+};
 type TimeComJogadores = {
   id: string;
   numero: number;
@@ -36,10 +41,10 @@ export default async function PaginaPartida({
   if (!data) notFound();
   const partida = data as Partida;
 
-  const [{ data: presencas }, { data: times }] = await Promise.all([
+  const [{ data: presencas }, { data: times }, { data: avaliacoes }] = await Promise.all([
     supabase
       .from("presencas")
-      .select("status, jogadores(*)")
+      .select("status, compareceu, jogadores(*)")
       .eq("partida_id", id)
       .order("atualizada_em", { ascending: true }),
     supabase
@@ -47,6 +52,7 @@ export default async function PaginaPartida({
       .select("id, numero, nome, cor, times_jogadores(papel, jogadores(*))")
       .eq("partida_id", id)
       .order("numero", { ascending: true }),
+    supabase.from("avaliacoes").select("jogador_id, nota").eq("partida_id", id),
   ]);
 
   const formacao = acharFormacao(partida.jogadores_por_time, partida.formacao);
@@ -70,6 +76,20 @@ export default async function PaginaPartida({
   const previaTimes = qtdTimesPorPresenca(confirmados.length, porTime);
   const timesFinais = timesSorteados.length > 0 ? timesSorteados.length : previaTimes;
   const vagas = timesFinais >= 2 ? timesFinais * porTime : confirmados.length;
+
+  // Painel do avaliador: quem confirmou, com o check-in e a nota atuais.
+  const podeAvaliar = (jogador?.avaliador ?? false) || (jogador?.admin ?? false);
+  const notas = new Map(
+    ((avaliacoes ?? []) as { jogador_id: string; nota: number }[]).map((a) => [a.jogador_id, a.nota]),
+  );
+  const itensAvaliacao = lista
+    .filter((p) => p.status === "vou" && p.jogadores)
+    .map((p) => ({
+      id: p.jogadores.id,
+      nome: p.jogadores.nome,
+      compareceu: p.compareceu,
+      nota: notas.get(p.jogadores.id) ?? null,
+    }));
 
   return (
     <div className="space-y-6">
@@ -115,6 +135,10 @@ export default async function PaginaPartida({
             motivoBloqueio={`O prazo encerrou em ${dataHora(partida.prazo_confirmacao)}. Fale com o organizador.`}
           />
         </section>
+      )}
+
+      {podeAvaliar && !cancelada && itensAvaliacao.length > 0 && (
+        <AvaliacaoJogo partidaId={partida.id} jogadores={itensAvaliacao} />
       )}
 
       {timesSorteados.length > 0 && (

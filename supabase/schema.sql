@@ -21,9 +21,11 @@ create table if not exists public.jogadores (
                 ),
   perna         text not null default 'destra'
                 check (perna in ('destra','canhota','ambidestro')),
-  nivel         smallint not null default 3 check (nivel between 1 and 5),
-  admin         boolean not null default false,
-  criado_em     timestamptz not null default now()
+  nivel           smallint not null default 3 check (nivel between 1 and 5),  -- auto-avaliação
+  nivel_calculado smallint,                                                   -- média das notas (null = sem nota)
+  admin           boolean not null default false,
+  avaliador       boolean not null default false,  -- quem dá as notas e faz o check-in
+  criado_em       timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------------
@@ -54,6 +56,7 @@ create table if not exists public.presencas (
   partida_id    uuid not null references public.partidas (id) on delete cascade,
   jogador_id    uuid not null references public.jogadores (id) on delete cascade,
   status        text not null check (status in ('vou','nao_vou','talvez')),
+  compareceu    boolean,  -- check-in do dia: apareceu de verdade? (null = não checado)
   atualizada_em timestamptz not null default now(),
   primary key (partida_id, jogador_id)
 );
@@ -80,11 +83,28 @@ create table if not exists public.times_jogadores (
   primary key (time_id, jogador_id)
 );
 
+-- ---------------------------------------------------------------------
+-- AVALIAÇÕES — nota de 0 a 10 por jogador por partida (dá o nível calculado)
+-- ---------------------------------------------------------------------
+create table if not exists public.avaliacoes (
+  partida_id   uuid not null references public.partidas (id) on delete cascade,
+  jogador_id   uuid not null references public.jogadores (id) on delete cascade,
+  nota         smallint not null check (nota between 0 and 10),
+  avaliador_id uuid references public.jogadores (id) on delete set null,
+  criada_em    timestamptz not null default now(),
+  primary key (partida_id, jogador_id)
+);
+
+create index if not exists avaliacoes_jogador_idx on public.avaliacoes (jogador_id);
+
 -- Colunas novas para quem já rodou uma versão anterior deste schema.
 alter table public.partidas        add column if not exists formacao text;
 alter table public.times_jogadores add column if not exists papel text not null default 'meio';
 alter table public.jogadores       add column if not exists nome_completo text;
 alter table public.jogadores       add column if not exists posicoes text[] not null default array['meia']::text[];
+alter table public.jogadores       add column if not exists nivel_calculado smallint;
+alter table public.jogadores       add column if not exists avaliador boolean not null default false;
+alter table public.presencas       add column if not exists compareceu boolean;
 
 -- ---------------------------------------------------------------------
 -- Cria o perfil automaticamente quando alguém se cadastra.
@@ -131,8 +151,22 @@ as $$
   select coalesce((select admin from public.jogadores where id = auth.uid()), false);
 $$;
 
--- Só um organizador pode mudar quem é organizador (a coluna admin). Sem isto,
--- o RLS deixaria alguém se autopromover editando a própria linha via API.
+-- Quem pode avaliar: o avaliador designado ou um organizador.
+create or replace function public.pode_avaliar()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select coalesce(
+    (select avaliador or admin from public.jogadores where id = auth.uid()),
+    false
+  );
+$$;
+
+-- Só um organizador muda as funções do grupo (admin/avaliador). Sem isto, o RLS
+-- deixaria alguém se autopromover editando a própria linha via API.
 create or replace function public.protege_admin()
 returns trigger
 language plpgsql
@@ -140,8 +174,10 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.admin is distinct from old.admin and not public.eh_admin() then
-    raise exception 'Apenas um organizador pode mudar quem e organizador.';
+  if (new.admin is distinct from old.admin
+      or new.avaliador is distinct from old.avaliador)
+     and not public.eh_admin() then
+    raise exception 'Apenas um organizador pode mudar as funcoes do grupo.';
   end if;
   return new;
 end;
@@ -152,6 +188,36 @@ create trigger jogadores_protege_admin
   before update on public.jogadores
   for each row execute function public.protege_admin();
 
+-- O nível calculado sai da média das notas (0-10 vira 1-5, arredondado).
+create or replace function public.recalcular_nivel()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  alvo  uuid;
+  media numeric;
+begin
+  alvo := coalesce(new.jogador_id, old.jogador_id);
+  select avg(nota) into media from public.avaliacoes where jogador_id = alvo;
+
+  update public.jogadores
+     set nivel_calculado = case
+           when media is null then null
+           else greatest(1, least(5, round(media / 2)))::smallint
+         end
+   where id = alvo;
+
+  return null;
+end;
+$$;
+
+drop trigger if exists avaliacoes_recalcula_nivel on public.avaliacoes;
+create trigger avaliacoes_recalcula_nivel
+  after insert or update or delete on public.avaliacoes
+  for each row execute function public.recalcular_nivel();
+
 -- ---------------------------------------------------------------------
 -- RLS — ninguém que não esteja logado enxerga nada.
 -- ---------------------------------------------------------------------
@@ -160,6 +226,7 @@ alter table public.partidas        enable row level security;
 alter table public.presencas       enable row level security;
 alter table public.times           enable row level security;
 alter table public.times_jogadores enable row level security;
+alter table public.avaliacoes      enable row level security;
 
 -- Jogadores: todo mundo do grupo se vê; cada um edita só o próprio perfil.
 drop policy if exists jogadores_leitura on public.jogadores;
@@ -194,6 +261,12 @@ create policy presencas_propria on public.presencas
   using (jogador_id = auth.uid() or public.eh_admin())
   with check (jogador_id = auth.uid() or public.eh_admin());
 
+-- O avaliador (ou organizador) faz o check-in na presença dos outros.
+drop policy if exists presencas_avaliador on public.presencas;
+create policy presencas_avaliador on public.presencas
+  for update to authenticated
+  using (public.pode_avaliar()) with check (public.pode_avaliar());
+
 -- Times: todos leem, só admin sorteia.
 drop policy if exists times_leitura on public.times;
 create policy times_leitura on public.times
@@ -211,6 +284,16 @@ drop policy if exists times_jogadores_admin_escreve on public.times_jogadores;
 create policy times_jogadores_admin_escreve on public.times_jogadores
   for all to authenticated using (public.eh_admin()) with check (public.eh_admin());
 
+-- Avaliações: todos do grupo leem; só quem pode avaliar escreve.
+drop policy if exists avaliacoes_leitura on public.avaliacoes;
+create policy avaliacoes_leitura on public.avaliacoes
+  for select to authenticated using (true);
+
+drop policy if exists avaliacoes_escrita on public.avaliacoes;
+create policy avaliacoes_escrita on public.avaliacoes
+  for all to authenticated
+  using (public.pode_avaliar()) with check (public.pode_avaliar());
+
 -- ---------------------------------------------------------------------
 -- Tempo real: o app escuta estas tabelas para atualizar sozinho.
 -- ---------------------------------------------------------------------
@@ -220,6 +303,7 @@ begin
   begin execute 'alter publication supabase_realtime add table public.partidas'; exception when duplicate_object then null; end;
   begin execute 'alter publication supabase_realtime add table public.times'; exception when duplicate_object then null; end;
   begin execute 'alter publication supabase_realtime add table public.times_jogadores'; exception when duplicate_object then null; end;
+  begin execute 'alter publication supabase_realtime add table public.avaliacoes'; exception when duplicate_object then null; end;
 end $$;
 
 alter table public.presencas replica identity full;

@@ -26,9 +26,27 @@ export type Jogador = {
   posicoes: Posicao[];
   perna: Perna;
   nivel: number;
+  nivel_calculado: number | null;
   admin: boolean;
+  avaliador: boolean;
   criado_em: string;
 };
+
+export type Avaliacao = {
+  partida_id: string;
+  jogador_id: string;
+  nota: number;
+  avaliador_id: string | null;
+  criada_em: string;
+};
+
+/**
+ * O nível que vale de verdade: o calculado pelas notas do avaliador, ou — se o
+ * jogador ainda não tem nota — o que ele marcou no próprio perfil.
+ */
+export function nivelEfetivo(j: { nivel: number; nivel_calculado: number | null }): number {
+  return j.nivel_calculado ?? j.nivel;
+}
 
 export type Partida = {
   id: string;
@@ -49,6 +67,7 @@ export type Presenca = {
   partida_id: string;
   jogador_id: string;
   status: StatusPresenca;
+  compareceu: boolean | null;
   atualizada_em: string;
 };
 

@@ -1,20 +1,35 @@
 import { sessao } from "@/lib/sessao";
-import { ROTULO_PERNA, ROTULO_POSICAO, type Jogador } from "@/lib/tipos";
+import { nivelEfetivo, ROTULO_PERNA, ROTULO_POSICAO, type Jogador } from "@/lib/tipos";
 import { Etiqueta, Vazio } from "@/components/ui";
-import BotaoOrganizador from "./botao-organizador";
+import BotaoFuncao from "./botao-funcao";
 
 export const metadata = { title: "Elenco — Amigos da Bola" };
 
 export default async function PaginaElenco() {
   const { supabase, jogador } = await sessao();
 
-  const { data } = await supabase
-    .from("jogadores")
-    .select("*")
-    .order("nome", { ascending: true });
+  const [{ data }, { data: presencas }] = await Promise.all([
+    supabase.from("jogadores").select("*").order("nome", { ascending: true }),
+    supabase.from("presencas").select("jogador_id, compareceu"),
+  ]);
 
   const elenco = (data ?? []) as Jogador[];
   const admin = jogador?.admin ?? false;
+
+  // Presença = das vezes em que o check-in foi feito, quantas o jogador apareceu.
+  const presenca = new Map<string, { apareceu: number; total: number }>();
+  for (const p of (presencas ?? []) as { jogador_id: string; compareceu: boolean | null }[]) {
+    if (p.compareceu === null) continue;
+    const atual = presenca.get(p.jogador_id) ?? { apareceu: 0, total: 0 };
+    atual.total += 1;
+    if (p.compareceu) atual.apareceu += 1;
+    presenca.set(p.jogador_id, atual);
+  }
+  const percentPresenca = (id: string) => {
+    const p = presenca.get(id);
+    if (!p || p.total === 0) return null;
+    return Math.round((p.apareceu / p.total) * 100);
+  };
 
   return (
     <div className="space-y-5">
@@ -32,21 +47,26 @@ export default async function PaginaElenco() {
           {elenco.map((j) => (
             <li key={j.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 truncate font-semibold text-slate-900">
-                  {j.nome}
+                <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                  <span className="truncate">{j.nome}</span>
                   {j.id === jogador?.id && <Etiqueta cor="azul">você</Etiqueta>}
                   {j.admin && <Etiqueta cor="ouro">organizador</Etiqueta>}
+                  {j.avaliador && <Etiqueta cor="verde">avaliador</Etiqueta>}
                 </p>
                 <p className="text-sm text-slate-500">
                   {(j.posicoes ?? [j.posicao]).map((p) => ROTULO_POSICAO[p]).join(", ")} ·{" "}
                   {ROTULO_PERNA[j.perna]}
+                  {percentPresenca(j.id) !== null && ` · ${percentPresenca(j.id)}% presença`}
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-2">
-                <Estrelas nivel={j.nivel} />
+                <Estrelas nivel={nivelEfetivo(j)} calculado={j.nivel_calculado !== null} />
                 {admin && j.id !== jogador?.id && (
-                  <BotaoOrganizador jogadorId={j.id} ehOrganizador={j.admin} />
+                  <div className="flex flex-col items-end gap-1">
+                    <BotaoFuncao jogadorId={j.id} tipo="organizador" ativo={j.admin} />
+                    <BotaoFuncao jogadorId={j.id} tipo="avaliador" ativo={j.avaliador} />
+                  </div>
                 )}
               </div>
             </li>
@@ -56,20 +76,29 @@ export default async function PaginaElenco() {
 
       {admin && (
         <p className="text-sm text-slate-500">
-          Como organizador, você pode tornar outras pessoas organizadoras — elas
-          passam a criar jogos, editar e sortear os times. O nível de cada um é
-          definido no próprio perfil.
+          Como organizador, você define quem é <strong>organizador</strong> (cria
+          e sorteia jogos) e quem é <strong>avaliador</strong> (dá as notas nos
+          jogos e marca quem apareceu). O nível sai sozinho da média das notas;
+          sem notas ainda, vale a auto-avaliação do perfil.
         </p>
       )}
     </div>
   );
 }
 
-function Estrelas({ nivel }: { nivel: number }) {
+function Estrelas({ nivel, calculado }: { nivel: number; calculado?: boolean }) {
   return (
-    <span className="shrink-0 text-lg tracking-tight" aria-label={`Nível ${nivel} de 5`}>
+    <span
+      className="flex shrink-0 items-center gap-1 text-lg tracking-tight"
+      aria-label={`Nível ${nivel} de 5${calculado ? ", calculado pelas notas" : ""}`}
+    >
       <span className="text-ouro-400">{"★".repeat(nivel)}</span>
       <span className="text-slate-300">{"★".repeat(5 - nivel)}</span>
+      {calculado && (
+        <span className="text-xs font-semibold text-campo-600" title="Calculado pelas notas">
+          auto
+        </span>
+      )}
     </span>
   );
 }
